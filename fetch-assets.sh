@@ -80,7 +80,20 @@ save_image() {
     if [ "$pull" != "$ref" ]; then
       docker tag "$pull" "$ref" || die "docker tag failed: $pull -> $ref"
     fi
-    docker save -o "$dest" "$ref" || die "docker save failed for $ref"
+    # With Docker's containerd image store, 'docker save' writes the FULL
+    # multi-arch index. Importing that into k3s containerd fails with
+    # "content digest <other-arch>: not found". Save a single platform when the
+    # installed docker supports 'docker save --platform' (Engine v28+); older
+    # docker without the containerd store already holds only amd64, so a plain
+    # save is fine. If you hit the digest error on an old docker WITH the
+    # containerd store, disable it: set features.containerd-snapshotter=false in
+    # /etc/docker/daemon.json and restart docker (see README).
+    if docker save --help 2>&1 | grep -q -- '--platform'; then
+      docker save --platform linux/amd64 -o "$dest" "$ref" \
+        || die "docker save failed for $ref"
+    else
+      docker save -o "$dest" "$ref" || die "docker save failed for $ref"
+    fi
   else
     die "need 'skopeo' or 'docker' to export images; install one and re-run."
   fi

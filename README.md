@@ -116,6 +116,16 @@ sudo ./uninstall.sh --purge                     # also uninstall k3s (nukes clus
   `manifest.env` must be the ones the chosen operator version deploys, and must
   match the saved tarballs — otherwise pods will try (and fail) to pull. Step 20
   warns if a manifest image isn't present in containerd after import.
+- **`ctr: content digest ... not found` on import (step 20):** the saved tarball
+  is a multi-arch index missing the other arches' blobs. This happens when you
+  fetch with **docker + the containerd image store** and an old `docker save`
+  that can't filter by platform. Fixes: (a) use a docker that supports
+  `docker save --platform` (Engine v28+) — `fetch-assets.sh` passes it
+  automatically; (b) set `"features": {"containerd-snapshotter": false}` in
+  `/etc/docker/daemon.json`, `systemctl restart docker`, then re-fetch; or
+  (c) install `skopeo` (preferred). After any of these, delete
+  `vendor/images/*.tar` and re-run `fetch-assets.sh` to regenerate the
+  tarballs + `SHA256SUMS`, recopy, and re-run `install.sh`.
 - **Architecture:** vendored assets are **amd64** (`k3s` binary and
   `k3s-airgap-images-amd64.tar.zst`, images saved `--arch amd64`). For arm64,
   change the filenames/flags in `manifest.env` + `fetch-assets.sh` and re-fetch.
