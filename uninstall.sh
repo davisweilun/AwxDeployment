@@ -5,8 +5,16 @@
 #   sudo ./uninstall.sh --purge   # also run k3s-uninstall.sh (nukes the cluster)
 set -euo pipefail
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/scripts/lib.sh"
-load_config
 require_root
+
+# Teardown only needs the namespace + instance name. Use config.env if present,
+# otherwise fall back to defaults so you can still uninstall after deleting it.
+if [ -f "${REPO_ROOT}/config.env" ]; then
+  # shellcheck disable=SC1091
+  . "${REPO_ROOT}/config.env"
+fi
+AWX_NAMESPACE="${AWX_NAMESPACE:-awx}"
+AWX_NAME="${AWX_NAME:-awx}"
 
 if command -v k3s >/dev/null 2>&1; then
   if k3s kubectl get awx "${AWX_NAME}" -n "${AWX_NAMESPACE}" >/dev/null 2>&1; then

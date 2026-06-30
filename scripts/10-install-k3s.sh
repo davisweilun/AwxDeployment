@@ -30,13 +30,15 @@ else
 fi
 
 log "Waiting for the node to become Ready"
+ready=0
 for _ in $(seq 1 60); do
   if k3s kubectl get nodes 2>/dev/null | grep -q ' Ready'; then
     ok "k3s node Ready: $(k3s kubectl get nodes --no-headers | awk '{print $1" "$2}')"
+    ready=1
     break
   fi
   sleep 5
 done
-k3s kubectl get nodes >/dev/null 2>&1 || die "k3s node never became Ready"
+[ "$ready" -eq 1 ] || die "k3s node never became Ready (still NotReady after 300s)"
 
 ok "k3s is up. kubeconfig: /etc/rancher/k3s/k3s.yaml"

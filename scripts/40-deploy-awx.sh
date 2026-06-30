@@ -45,10 +45,14 @@ sed \
   -e "s|__AWX_REDIS_VERSION__|${AWX_REDIS_IMAGE_VERSION}|g" \
   -e "s|__AWX_POSTGRES_STORAGE__|${AWX_POSTGRES_STORAGE}|g" \
   -e "s|__AWX_PROJECTS_STORAGE__|${AWX_PROJECTS_STORAGE}|g" \
-  -e "s|__TLS_SECRET_LINE__|${TLS_SECRET_LINE}|g" \
   "${CONFIG_DIR}/awx.yaml.tmpl" > "$out"
-# Drop the TLS placeholder line entirely when not used.
-[ -z "$TLS_SECRET_LINE" ] && sed -i '/__TLS_SECRET_LINE__/d' "$out" 2>/dev/null || true
+# The TLS line lives on its own placeholder line: substitute it when in use,
+# otherwise delete the line entirely so no blank line is left behind.
+if [ -n "$TLS_SECRET_LINE" ]; then
+  sed -i "s|__TLS_SECRET_LINE__|${TLS_SECRET_LINE}|" "$out"
+else
+  sed -i '/__TLS_SECRET_LINE__/d' "$out"
+fi
 
 log "Applying AWX custom resource"
 k3s kubectl apply -f "$out" || die "failed to apply AWX CR"

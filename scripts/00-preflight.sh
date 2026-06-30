@@ -8,6 +8,12 @@ require_root
 
 log "Preflight checks"
 
+# --- Config sanity ---
+case "${AWX_SERVICE_TYPE}" in
+  nodeport|ingress) ;;
+  *) die "AWX_SERVICE_TYPE='${AWX_SERVICE_TYPE}' is invalid; use 'nodeport' or 'ingress'" ;;
+esac
+
 # --- OS / arch ---
 if [ -r /etc/os-release ]; then
   . /etc/os-release

@@ -65,9 +65,11 @@ single source of truth for both fetching and installing.
 
 Downloads the pinned k3s release and awx-operator source, and exports the AWX
 container images to `vendor/images/`, then writes `vendor/SHA256SUMS`. Image
-export needs **`skopeo`** (preferred, no daemon) or **`docker`** installed on the
-fetch host. This step only downloads — it installs nothing. Afterward the whole
-repo can be copied to an air-gapped target (`rsync`, USB, `git add -f vendor/...`).
+export uses **`docker`** on the fetch host; if docker isn't installed,
+`fetch-assets.sh` installs it automatically (via `apt` on Ubuntu/Debian) and
+starts its daemon. This step runs on the online fetch host only — it changes
+nothing on the air-gapped target. Afterward the whole repo can be copied to the
+target (`rsync`, USB, `git add -f vendor/...`).
 
 ### 2. Configure (on the target)
 
@@ -110,8 +112,9 @@ sudo ./uninstall.sh --purge                     # also uninstall k3s (nukes clus
 
 - **Idempotent:** re-running `install.sh` skips k3s install / operator extraction
   if already done and re-applies manifests. Safe to retry.
-- **Integrity:** preflight runs `sha256sum -c vendor/SHA256SUMS`. If you bump a
-  version in `manifest.env`, re-run `fetch-assets.sh` to refresh the sums.
+- **Integrity:** preflight runs `sha256sum -c vendor/SHA256SUMS` and refuses to
+  proceed if anything in `vendor/` was altered. See **Bumping versions** below
+  for refreshing the sums after a version change.
 - **Image tags must match the operator:** the AWX/EE/postgres/redis tags in
   `manifest.env` must be the ones the chosen operator version deploys, and must
   match the saved tarballs — otherwise pods will try (and fail) to pull. Step 20
@@ -121,11 +124,10 @@ sudo ./uninstall.sh --purge                     # also uninstall k3s (nukes clus
   fetch with **docker + the containerd image store** and an old `docker save`
   that can't filter by platform. Fixes: (a) use a docker that supports
   `docker save --platform` (Engine v28+) — `fetch-assets.sh` passes it
-  automatically; (b) set `"features": {"containerd-snapshotter": false}` in
-  `/etc/docker/daemon.json`, `systemctl restart docker`, then re-fetch; or
-  (c) install `skopeo` (preferred). After any of these, delete
-  `vendor/images/*.tar` and re-run `fetch-assets.sh` to regenerate the
-  tarballs + `SHA256SUMS`, recopy, and re-run `install.sh`.
+  automatically; or (b) set `"features": {"containerd-snapshotter": false}` in
+  `/etc/docker/daemon.json`, `systemctl restart docker`, then re-fetch. After
+  either, delete `vendor/images/*.tar` and re-run `fetch-assets.sh` to regenerate
+  the tarballs + `SHA256SUMS`, recopy, and re-run `install.sh`.
 - **Architecture:** vendored assets are **amd64** (`k3s` binary and
   `k3s-airgap-images-amd64.tar.zst`, images saved `--arch amd64`). For arm64,
   change the filenames/flags in `manifest.env` + `fetch-assets.sh` and re-fetch.
@@ -136,4 +138,5 @@ sudo ./uninstall.sh --purge                     # also uninstall k3s (nukes clus
 - **First boot is slow:** the operator initializes postgres and runs migrations;
   pods may restart a few times before settling. No internet is used during this.
 - **Bumping versions:** edit `vendor/manifest.env` (and the image tags in it),
-  then re-run `fetch-assets.sh`.
+  then re-run `fetch-assets.sh` to re-download/re-export the changed assets and
+  regenerate `vendor/SHA256SUMS`.

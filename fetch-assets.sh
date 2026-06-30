@@ -8,9 +8,8 @@
 # a fully self-contained, air-gap-ready bundle. This script DOES NOT install
 # anything on a cluster — it only downloads and exports images.
 #
-# Image export needs a tool that can pull OCI images:
-#   - skopeo (preferred; no daemon required), OR
-#   - docker (uses the local daemon).
+# Image export uses docker (pull + save). If docker isn't installed this script
+# installs it automatically via apt (Ubuntu/Debian) and starts its daemon.
 # =============================================================================
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,6 +19,35 @@ load_manifest
 
 need_cmd curl
 need_cmd sha256sum
+
+# Run docker as root via sudo when we're not already root (the daemon socket is
+# root-owned). apt installs below also need it.
+SUDO=""; [ "$(id -u)" -eq 0 ] || SUDO="sudo"
+DOCKER="docker"; [ "$(id -u)" -eq 0 ] || DOCKER="sudo docker"
+
+# Ensure docker is installed and its daemon is reachable; install it if missing.
+ensure_docker() {
+  if command -v docker >/dev/null 2>&1; then
+    ok "docker present: $(docker --version 2>/dev/null)"
+  else
+    warn "docker not found — installing it (needed to export the AWX images)"
+    command -v apt-get >/dev/null 2>&1 \
+      || die "docker is missing and auto-install requires apt-get (Ubuntu/Debian); install docker manually and re-run."
+    $SUDO apt-get update -y            || die "apt-get update failed"
+    $SUDO apt-get install -y docker.io || die "apt-get install docker.io failed"
+    command -v docker >/dev/null 2>&1  || die "docker still not on PATH after install"
+    command -v systemctl >/dev/null 2>&1 && $SUDO systemctl enable --now docker 2>/dev/null || true
+    ok "docker installed: $(docker --version 2>/dev/null)"
+  fi
+  # Verify the daemon answers (start it if it isn't running).
+  if ! $DOCKER info >/dev/null 2>&1; then
+    warn "docker daemon not reachable — trying to start it"
+    command -v systemctl >/dev/null 2>&1 && $SUDO systemctl enable --now docker 2>/dev/null || true
+    $DOCKER info >/dev/null 2>&1 \
+      || die "docker is installed but its daemon isn't reachable; start it (sudo systemctl start docker) and re-run."
+  fi
+}
+ensure_docker
 
 K3S_DIR="${VENDOR_DIR}/k3s"
 OP_DIR="${VENDOR_DIR}/operator"
@@ -68,34 +96,25 @@ save_image() {
   fi
   if [ "$pull" = "$ref" ]; then log "pulling + saving $ref"
   else                          log "pulling $pull -> saving as $ref"; fi
-  if command -v skopeo >/dev/null 2>&1; then
-    # Export as an OCI archive: 'k3s ctr images import' ingests these reliably,
-    # whereas skopeo's docker-archive output can fail import with
-    # "content digest ... not found". The ':${ref}' adds the human tag.
-    skopeo copy --override-os linux --override-arch amd64 \
-      "docker://${pull}" "oci-archive:${dest}:${ref}" \
-      || die "skopeo copy failed for $pull"
-  elif command -v docker >/dev/null 2>&1; then
-    docker pull --platform linux/amd64 "$pull" || die "docker pull failed for $pull"
-    if [ "$pull" != "$ref" ]; then
-      docker tag "$pull" "$ref" || die "docker tag failed: $pull -> $ref"
-    fi
-    # With Docker's containerd image store, 'docker save' writes the FULL
-    # multi-arch index. Importing that into k3s containerd fails with
-    # "content digest <other-arch>: not found". Save a single platform when the
-    # installed docker supports 'docker save --platform' (Engine v28+); older
-    # docker without the containerd store already holds only amd64, so a plain
-    # save is fine. If you hit the digest error on an old docker WITH the
-    # containerd store, disable it: set features.containerd-snapshotter=false in
-    # /etc/docker/daemon.json and restart docker (see README).
-    if docker save --help 2>&1 | grep -q -- '--platform'; then
-      docker save --platform linux/amd64 -o "$dest" "$ref" \
-        || die "docker save failed for $ref"
-    else
-      docker save -o "$dest" "$ref" || die "docker save failed for $ref"
-    fi
+  $DOCKER pull --platform linux/amd64 "$pull" || die "docker pull failed for $pull"
+  if [ "$pull" != "$ref" ]; then
+    $DOCKER tag "$pull" "$ref" || die "docker tag failed: $pull -> $ref"
+  fi
+  # With Docker's containerd image store, 'docker save' writes the FULL
+  # multi-arch index. Importing that into k3s containerd fails with
+  # "content digest <other-arch>: not found". Save a single platform when the
+  # installed docker supports 'docker save --platform' (Engine v28+); older
+  # docker without the containerd store already holds only amd64, so a plain
+  # save is fine. If you hit the digest error on an old docker WITH the
+  # containerd store, disable it: set features.containerd-snapshotter=false in
+  # /etc/docker/daemon.json and restart docker (see README).
+  # Redirect via the shell (not 'docker -o') so the tarball is owned by the
+  # current user even when docker runs under sudo.
+  if $DOCKER save --help 2>&1 | grep -q -- '--platform'; then
+    $DOCKER save --platform linux/amd64 "$ref" > "$dest" \
+      || die "docker save failed for $ref"
   else
-    die "need 'skopeo' or 'docker' to export images; install one and re-run."
+    $DOCKER save "$ref" > "$dest" || die "docker save failed for $ref"
   fi
 }
 

@@ -58,7 +58,3 @@ load_config() {
 require_root() {
   [ "$(id -u)" -eq 0 ] || die "this step must run as root (use sudo)."
 }
-
-# k3s ships its own kubectl. Use it so we don't depend on a separate binary.
-kubectl() { k3s kubectl "$@"; }
-export -f kubectl 2>/dev/null || true
