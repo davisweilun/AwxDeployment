@@ -105,6 +105,10 @@ for img in $AWX_IMAGES; do
   if [ "$img" = "$INIT_REF" ] && [ -n "${AWX_INIT_IMAGE_DIGEST:-}" ]; then
     # Pin the init image by digest, but save it under its :stream9 tag.
     save_image "$img" "${AWX_INIT_IMAGE_NAME}@${AWX_INIT_IMAGE_DIGEST}"
+  elif [ "$img" = "${AWX_KUBE_RBAC_PROXY_IMAGE:-}" ] && [ -n "${AWX_KUBE_RBAC_PROXY_PULL:-}" ]; then
+    # gcr.io address is dead; pull from the maintainer's registry, save under
+    # the gcr.io name the operator references.
+    save_image "$img" "${AWX_KUBE_RBAC_PROXY_PULL}"
   else
     save_image "$img"
   fi
