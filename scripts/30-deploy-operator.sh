@@ -27,8 +27,11 @@ fi
 log "Rendering operator kustomization (namespace=${AWX_NAMESPACE})"
 RENDER_DIR="${OP_DIR}/deploy"
 mkdir -p "$RENDER_DIR"
+# kustomize forbids absolute resource roots, so reference the source tree by a
+# path relative to RENDER_DIR (vendor/operator/deploy -> ../awx-operator-<ver>).
+OP_REL="../awx-operator-${AWX_OPERATOR_VERSION}"
 sed \
-  -e "s|__OP_HOME__|${OP_HOME}|g" \
+  -e "s|__OP_REL__|${OP_REL}|g" \
   -e "s|__AWX_NAMESPACE__|${AWX_NAMESPACE}|g" \
   -e "s|__AWX_OPERATOR_VERSION__|${AWX_OPERATOR_VERSION}|g" \
   "${CONFIG_DIR}/kustomization.yaml.tmpl" > "${RENDER_DIR}/kustomization.yaml"
