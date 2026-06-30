@@ -69,8 +69,11 @@ save_image() {
   if [ "$pull" = "$ref" ]; then log "pulling + saving $ref"
   else                          log "pulling $pull -> saving as $ref"; fi
   if command -v skopeo >/dev/null 2>&1; then
+    # Export as an OCI archive: 'k3s ctr images import' ingests these reliably,
+    # whereas skopeo's docker-archive output can fail import with
+    # "content digest ... not found". The ':${ref}' adds the human tag.
     skopeo copy --override-os linux --override-arch amd64 \
-      "docker://${pull}" "docker-archive:${dest}:${ref}" \
+      "docker://${pull}" "oci-archive:${dest}:${ref}" \
       || die "skopeo copy failed for $pull"
   elif command -v docker >/dev/null 2>&1; then
     docker pull --platform linux/amd64 "$pull" || die "docker pull failed for $pull"
