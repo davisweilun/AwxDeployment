@@ -26,7 +26,7 @@ arch="$(dpkg --print-architecture 2>/dev/null || uname -m)"
 [ -s "${VENDOR_DIR}/operator/${AWX_OPERATOR_SRC_TGZ}" ] \
   || die "awx-operator source missing — run fetch-assets.sh first"
 img_count=$(find "${VENDOR_DIR}/images" -name '*.tar' 2>/dev/null | wc -l | tr -d ' ')
-[ "$img_count" -ge 6 ] || die "expected >=6 image tarballs in vendor/images, found $img_count — run fetch-assets.sh"
+[ "$img_count" -ge 7 ] || die "expected >=7 image tarballs in vendor/images, found $img_count — run fetch-assets.sh"
 
 # --- Checksum verification ---
 if [ -f "$SHA256SUMS" ]; then
