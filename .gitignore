@@ -1,0 +1,21 @@
+# Secrets / local config
+config.env
+
+# Bring-your-own certs (never commit private keys)
+certs/*.pem
+
+# Rendered artifacts (regenerated on every install)
+config/awx.rendered.yaml
+vendor/operator/deploy/
+vendor/operator/awx-operator-*/
+
+# Vendored binaries/images are large. Ship them by force-adding if you want a
+# fully self-contained repo:
+#   git add -f vendor/k3s vendor/operator/*.tar.gz vendor/images
+# Otherwise re-run fetch-assets.sh on the target side of the air gap.
+vendor/k3s/
+vendor/operator/*.tar.gz
+vendor/images/
+
+# Rendered/extracted artifacts (should never live in the repo)
+*.log

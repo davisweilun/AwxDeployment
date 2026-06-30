@@ -1,0 +1,42 @@
+# AWX custom resource, rendered by scripts/40-deploy-awx.sh.
+# Placeholders __LIKE_THIS__ are substituted from config.env / manifest.env.
+# Do not edit the rendered copy (config/awx.rendered.yaml) by hand — re-run
+# install to regenerate. Spec reference: https://ansible.readthedocs.io/projects/awx-operator/
+---
+apiVersion: awx.ansible.com/v1beta1
+kind: AWX
+metadata:
+  name: __AWX_NAME__
+  namespace: __AWX_NAMESPACE__
+spec:
+  # --- Access ---
+  hostname: __AWX_HOSTNAME__
+  service_type: __AWX_SERVICE_TYPE__
+  nodeport_port: __AWX_NODEPORT__
+__TLS_SECRET_LINE__
+
+  # --- Initial admin credentials ---
+  admin_user: admin
+  admin_password_secret: __SECRET_NAME__
+
+  # --- Images (pinned to the tarballs imported offline into containerd) ---
+  image: __AWX_IMAGE__
+  image_version: "__AWX_IMAGE_VERSION__"
+  image_pull_policy: IfNotPresent
+  ee_images:
+    - name: AWX EE (latest)
+      image: __AWX_EE_IMAGE__
+  control_plane_ee_image: __AWX_EE_IMAGE__
+  init_projects_container_image: __AWX_INIT_IMAGE__
+  postgres_image: __AWX_POSTGRES_IMAGE__
+  postgres_image_version: "__AWX_POSTGRES_VERSION__"
+  redis_image: __AWX_REDIS_IMAGE__
+  redis_image_version: "__AWX_REDIS_VERSION__"
+
+  # --- Persistent storage (uses k3s default local-path StorageClass) ---
+  postgres_storage_requirements:
+    requests:
+      storage: __AWX_POSTGRES_STORAGE__
+  projects_persistence: true
+  projects_storage_size: __AWX_PROJECTS_STORAGE__
+  projects_storage_access_mode: ReadWriteOnce

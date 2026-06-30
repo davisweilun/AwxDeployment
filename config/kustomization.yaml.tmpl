@@ -1,0 +1,17 @@
+# Operator kustomization, rendered by scripts/30-deploy-operator.sh.
+# Builds from the vendored awx-operator source tree (offline) and pins the
+# operator image to the tag we imported into containerd.
+# Placeholders __LIKE_THIS__ are substituted from manifest.env / config.env.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - __OP_HOME__/config/default
+
+namespace: __AWX_NAMESPACE__
+
+# Pin the operator image tag to the release we vendored. (The vendored source's
+# own default already matches this; this makes it explicit and bump-proof.)
+images:
+  - name: quay.io/ansible/awx-operator
+    newTag: "__AWX_OPERATOR_VERSION__"
